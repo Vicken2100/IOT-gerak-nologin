@@ -14,6 +14,7 @@ import { Cloud, Cpu, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ControlPanel } from './components/ControlPanel';
 import { HardwareSimulator } from './components/HardwareSimulator';
+import { PeakHourProfileView } from './components/PeakHourProfileView';
 import { UsageAnalytics } from './components/UsageAnalytics';
 import { WiringAndCodeView } from './components/WiringAndCodeView';
 import { db, handleFirestoreError, OperationType } from './lib/firebase';
@@ -29,7 +30,7 @@ import {
   UsageLog,
 } from './types/lamp';
 
-type ActiveTab = 'simulator' | 'logs' | 'wiring';
+type ActiveTab = 'simulator' | 'logs' | 'profile' | 'wiring';
 
 const DEFAULT_DEVICE_ID = 'lolin-lamp-01';
 const STORAGE_KEY_DEVICE_ID = 'lolin_active_device_id';
@@ -451,6 +452,7 @@ export default function App() {
               [
                 { id: 'simulator', label: 'Simulator & Kontrol' },
                 { id: 'logs', label: 'Log Pemakaian' },
+                { id: 'profile', label: 'Profil 24 Jam' },
                 { id: 'wiring', label: 'Skema & Kode ESP' },
               ] as const
             ).map((tab) => (
@@ -565,6 +567,18 @@ export default function App() {
             sessionElapsedSec={sessionElapsedSec}
             lampWatts={LAMP_WATTS}
             onDeleteLog={(id) => void handleDeleteLog(id)}
+          />
+        )}
+
+        {activeTab === 'profile' && (
+          <PeakHourProfileView
+            logs={logs}
+            loading={logsLoading}
+            lampOn={device.lampOn}
+            activeSessionStartedAtMs={device.activeSessionStartedAtMs}
+            lastTriggerSource={device.lastTriggerSource}
+            lampWatts={LAMP_WATTS}
+            onGoToSimulator={() => setActiveTab('simulator')}
           />
         )}
 
