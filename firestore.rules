@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidDateKey(dateKey) {
+      return dateKey is string
+        && dateKey.size() == 10
+        && dateKey.matches('^20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+    }
+
+    function isValidLampDevice(data, deviceId) {
+      return data.keys().hasAll([
+          'id', 'name', 'boardModel', 'lampOn', 'standbyMode',
+          'motionDetected', 'motionHoldSeconds', 'timerEnabled',
+          'timerDurationSeconds', 'timerEndsAtMs', 'lastTriggerSource',
+          'activeSessionStartedAtMs', 'pirPin', 'relayPin', 'relayActiveLow',
+          'wifiSsid', 'espOnline', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'name', 'boardModel', 'lampOn', 'standbyMode',
+          'motionDetected', 'motionHoldSeconds', 'timerEnabled',
+          'timerDurationSeconds', 'timerEndsAtMs', 'lastTriggerSource',
+          'activeSessionStartedAtMs', 'pirPin', 'relayPin', 'relayActiveLow',
+          'wifiSsid', 'espOnline', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.id == deviceId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.boardModel in ['LOLIN_NODEMCU_V3', 'LOLIN_D1_MINI']
+        && data.lampOn is bool
+        && data.standbyMode is bool
+        && data.motionDetected is bool
+        && data.motionHoldSeconds is int && data.motionHoldSeconds >= 5 && data.motionHoldSeconds <= 600
+        && data.timerEnabled is bool
+        && data.timerDurationSeconds is int && data.timerDurationSeconds >= 5 && data.timerDurationSeconds <= 86400
+        && (data.timerEndsAtMs is int || data.timerEndsAtMs is float) && data.timerEndsAtMs >= 0
+        && data.lastTriggerSource in ['manual', 'motion', 'timer', 'system']
+        && (data.activeSessionStartedAtMs is int || data.activeSessionStartedAtMs is float) && data.activeSessionStartedAtMs >= 0
+        && data.pirPin in ['D5', 'D6', 'D7', 'D2']
+        && data.relayPin in ['D1', 'D2', 'D3', 'D0']
+        && data.relayActiveLow is bool
+        && data.wifiSsid is string && data.wifiSsid.size() <= 64
+        && data.espOnline is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUsageLog(data, deviceId, logId) {
+      return data.keys().hasAll([
+          'id', 'deviceId', 'dateKey', 'startedAtMs',
+          'endedAtMs', 'durationSeconds', 'triggerSource', 'endReason',
+          'watts', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'deviceId', 'dateKey', 'startedAtMs',
+          'endedAtMs', 'durationSeconds', 'triggerSource', 'endReason',
+          'watts', 'createdAt'
+        ])
+        && isValidId(data.id)
+        && data.id == logId
+        && isValidId(data.deviceId)
+        && data.deviceId == deviceId
+        && isValidDateKey(data.dateKey)
+        && (data.startedAtMs is int || data.startedAtMs is float) && data.startedAtMs > 0
+        && (data.endedAtMs is int || data.endedAtMs is float) && data.endedAtMs >= data.startedAtMs
+        && data.durationSeconds is int && data.durationSeconds >= 1 && data.durationSeconds <= 86400
+        && data.triggerSource in ['manual', 'motion', 'timer']
+        && data.endReason in ['manual', 'timer_expired', 'motion_timeout', 'standby_off']
+        && (data.watts is int || data.watts is float) && data.watts >= 1 && data.watts <= 2000
+        && data.createdAt is timestamp;
+    }
+
+    match /devices/{deviceId} {
+      // Direct single-device access without Google sign-in; list enumeration disabled
+      allow get: if isValidId(deviceId);
+      allow list: if false;
+
+      allow create: if isValidId(deviceId)
+        && isValidLampDevice(incoming(), deviceId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(deviceId)
+        && isValidLampDevice(incoming(), deviceId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Toggle lamp / timer / motion state
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'lampOn', 'motionDetected', 'timerEndsAtMs', 'lastTriggerSource',
+            'activeSessionStartedAtMs', 'espOnline', 'updatedAt'
+          ]) ||
+          // Action: Configure standby mode, timer settings, or hardware config
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'boardModel', 'standbyMode', 'motionHoldSeconds',
+            'timerEnabled', 'timerDurationSeconds', 'pirPin', 'relayPin',
+            'relayActiveLow', 'wifiSsid', 'espOnline', 'updatedAt'
+          ]) ||
+          // Action: Combined lamp control + config update
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'lampOn', 'standbyMode', 'motionDetected', 'motionHoldSeconds',
+            'timerEnabled', 'timerDurationSeconds', 'timerEndsAtMs',
+            'lastTriggerSource', 'activeSessionStartedAtMs', 'espOnline',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if false;
+
+      match /usageLogs/{logId} {
+        allow get: if isValidId(deviceId)
+          && isValidId(logId)
+          && exists(/databases/$(database)/documents/devices/$(deviceId));
+
+        allow list: if resource.data.deviceId == deviceId;
+
+        allow create: if isValidId(deviceId)
+          && isValidId(logId)
+          && isValidUsageLog(incoming(), deviceId, logId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/devices/$(deviceId));
+
+        allow update: if false;
+
+        allow delete: if isValidId(deviceId)
+          && isValidId(logId)
+          && existing().deviceId == deviceId
+          && exists(/databases/$(database)/documents/devices/$(deviceId));
+      }
+    }
+  }
+}

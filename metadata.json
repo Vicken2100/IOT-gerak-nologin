@@ -1,0 +1,6 @@
+{
+  "name": "LolinLamp Studio",
+  "description": "Simulator lampu otomatis ESP8266 Lolin dengan sensor gerak PIR, modul relay, timer otomatis, log durasi pemakaian harian, skema kabel, dan sinkronisasi Firebase real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

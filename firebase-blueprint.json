@@ -1,0 +1,206 @@
+{
+  "entities": {
+    "LampDevice": {
+      "title": "LampDevice",
+      "description": "Represents an ESP8266 Lolin smart lamp controller with PIR motion sensor, relay state, standby mode, and auto-off timer.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique device identifier",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable lamp device name",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "boardModel": {
+          "type": "string",
+          "description": "ESP Lolin board variant",
+          "enum": ["LOLIN_NODEMCU_V3", "LOLIN_D1_MINI"]
+        },
+        "lampOn": {
+          "type": "boolean",
+          "description": "Current relay and lamp illumination state"
+        },
+        "standbyMode": {
+          "type": "boolean",
+          "description": "When enabled, PIR motion sensor automatically triggers the lamp"
+        },
+        "motionDetected": {
+          "type": "boolean",
+          "description": "Current simulated or live PIR motion detection state"
+        },
+        "motionHoldSeconds": {
+          "type": "integer",
+          "description": "Duration in seconds to keep lamp on after motion stops"
+        },
+        "timerEnabled": {
+          "type": "boolean",
+          "description": "Whether turning on the lamp arms an automatic shutoff timer"
+        },
+        "timerDurationSeconds": {
+          "type": "integer",
+          "description": "Configured countdown duration in seconds"
+        },
+        "timerEndsAtMs": {
+          "type": "number",
+          "description": "Epoch milliseconds when the active timer expires, or 0 if inactive"
+        },
+        "lastTriggerSource": {
+          "type": "string",
+          "description": "Origin of the latest state transition",
+          "enum": ["manual", "motion", "timer", "system"]
+        },
+        "activeSessionStartedAtMs": {
+          "type": "number",
+          "description": "Epoch milliseconds when current active lamp session began, or 0 when off"
+        },
+        "pirPin": {
+          "type": "string",
+          "description": "ESP Lolin GPIO label wired to PIR OUT",
+          "enum": ["D5", "D6", "D7", "D2"]
+        },
+        "relayPin": {
+          "type": "string",
+          "description": "ESP Lolin GPIO label wired to Relay IN",
+          "enum": ["D1", "D2", "D3", "D0"]
+        },
+        "relayActiveLow": {
+          "type": "boolean",
+          "description": "True for optocoupler active-LOW relay modules"
+        },
+        "wifiSsid": {
+          "type": "string",
+          "description": "Configured Wi-Fi SSID label (non-secret)",
+          "minLength": 0,
+          "maxLength": 64
+        },
+        "espOnline": {
+          "type": "boolean",
+          "description": "Simulated or live Wi-Fi connection state of the ESP Lolin"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "boardModel",
+        "lampOn",
+        "standbyMode",
+        "motionDetected",
+        "motionHoldSeconds",
+        "timerEnabled",
+        "timerDurationSeconds",
+        "timerEndsAtMs",
+        "lastTriggerSource",
+        "activeSessionStartedAtMs",
+        "pirPin",
+        "relayPin",
+        "relayActiveLow",
+        "wifiSsid",
+        "espOnline",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UsageLog": {
+      "title": "UsageLog",
+      "description": "Completed lamp illumination session recorded for daily duration analytics.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique log identifier",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Parent LampDevice ID",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "dateKey": {
+          "type": "string",
+          "description": "Local calendar date in YYYY-MM-DD format",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "startedAtMs": {
+          "type": "number",
+          "description": "Session start epoch milliseconds"
+        },
+        "endedAtMs": {
+          "type": "number",
+          "description": "Session end epoch milliseconds"
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Total active duration in seconds (1 to 86400)"
+        },
+        "triggerSource": {
+          "type": "string",
+          "description": "What initially turned the lamp on",
+          "enum": ["manual", "motion", "timer"]
+        },
+        "endReason": {
+          "type": "string",
+          "description": "What turned the lamp off",
+          "enum": ["manual", "timer_expired", "motion_timeout", "standby_off"]
+        },
+        "watts": {
+          "type": "number",
+          "description": "Lamp rated wattage for energy estimation"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "deviceId",
+        "dateKey",
+        "startedAtMs",
+        "endedAtMs",
+        "durationSeconds",
+        "triggerSource",
+        "endReason",
+        "watts",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/devices/{deviceId}": {
+      "schema": {
+        "$ref": "#/entities/LampDevice"
+      },
+      "description": "Top-level collection storing ESP Lolin smart lamp device configuration and real-time state without requiring Google sign-in."
+    },
+    "/devices/{deviceId}/usageLogs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/UsageLog"
+      },
+      "description": "Subcollection storing completed daily lamp usage session logs."
+    }
+  }
+}
